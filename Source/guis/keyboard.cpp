@@ -1,7 +1,8 @@
 #include "keyboard.h"
 
-#include "apis\display.h"
-#include "apis\touch.h"
+#include "apis/console.h"
+#include "apis/display.h"
+#include "apis/touch.h"
 
 namespace Gui_Keyboard
 {
@@ -11,30 +12,36 @@ namespace Gui_Keyboard
         {
             if(Type)
             {
-		        Api_Display::DrawBmp("/System/KeyboardNumbersUp.bmp", 0, 130);
+		        Api_Display::DrawBmp("/System/Guis/NumbersUp.bmp", 0, 130);
             }
             else
             {
-		        Api_Display::DrawBmp("/System/KeyboardLettersUp.bmp", 0, 130);
+		        Api_Display::DrawBmp("/System/Guis/LettersUp.bmp", 0, 130);
             }
         }
         else
         {
             if(Type)
             {
-		        Api_Display::DrawBmp("/System/KeyboardNumbersDown.bmp", 0, 130);
+		        Api_Display::DrawBmp("/System/Guis/NumbersDown.bmp", 0, 130);
             }
             else
             {
-		        Api_Display::DrawBmp("/System/KeyboardLettersDown.bmp", 0, 130);
+		        Api_Display::DrawBmp("/System/Guis/LettersDown.bmp", 0, 130);
             }
         }
     }
 
-    String GetInput(String Text)
+    void SwitchKeyboardLayout()
+    {
+		Api_Display::DrawBmp("/System/Guis/NumbersOnly.bmp", 0, 130);
+    }
+
+    String TextInput(String Text, bool Password)
     {
         String Result = "";
-        char Input[128];
+        String Display = "";
+        char Input[256];
         int Index = 0;
         bool Done = false;
 
@@ -48,13 +55,22 @@ namespace Gui_Keyboard
             49, 50, 51, 52, 53, 54, 55, 56, 57, 48, 64, 35, 36, 95, 38, 45, 43, 40, 41, 42, 34, 39, 58, 59, 33, 63, 92, 47, 32,
             126, 96, 124, 32, 32, 32, 247, 215, 182, 32, 163, 162, 32, 165, 94, 176, 61, 123, 125, 37, 169, 174, 32, 32, 91, 93, 60, 62, 32
         };
-                
-        SmartWatch->tft->fillScreen(0);
-        SmartWatch->tft->setTextSize(2);
-        SmartWatch->tft->textcolor = SmartWatch->tft->color565(255, 255, 255);
-        SmartWatch->tft->textbgcolor = 0;
+
+        if(Text.length() > 256)
+        {
+            Text = Text.substring(0, 256);
+        }
+
+        for (Index = 0; Index < Text.length(); Index++)
+        {
+            Input[Index] = Text[Index];
+        }
+
+        Api_Display::Clear();
 
         SwitchKeyboardLayout(CharactersSize, CharactersType);
+
+        Api_Console::Log(Api_Console::LogType::Info, "Text keyboard displayed.");
 
         while(!Done)
         {
@@ -136,25 +152,143 @@ namespace Gui_Keyboard
                         Index++;
                     }
 
-                    SmartWatch->tft->fillRect(0, 0, 240, 130, 0);
+                    Result = "";
+                    Display = "";
+
+                    Api_Display::DrawRectangle(0, 0, 240, 130, Color_Black_Dark, true);
 
                     for (int i = 0; i < Index; i++)
                     {
-                        if(i % 19 == 0)
+                        Result += Input[i];
+
+                        if(Password)
                         {
-                            SmartWatch->tft->setCursor(5, 5 + i);
+                            Display += "*";
                         }
-                        SmartWatch->tft->print(Input[i]);
+                        else
+                        {
+                            Display += Input[i];
+                        }
                     }
+
+                    while(Result.length() > 128)
+                    {
+                        Result = Result.substring(16);
+                    }
+
+                    Api_Display::DrawText(Result, 5, 5, 2, Color_White_Light, Color_Black_Dark, 230);
                 }
             }
+
+            if(Api_Touch::ReadButton())
+			{
+                Result = "";
+				Done = true;
+			}
+            
             delay(10);
         }
 
-        for (int i = 0; i < Index; i++)
+        Api_Console::Log(Api_Console::LogType::Info, "Result: " + Result);
+
+        return Result;
+    }
+
+    String NumberInput(bool Negative, bool Decimals, bool Multi)
+    {
+        String Result = "";
+        char Input[16];
+        int Index = 0;
+        bool Done = false;
+
+        Api_Display::Clear();
+
+        SwitchKeyboardLayout();
+
+        Api_Console::Log(Api_Console::LogType::Info, "Numeric keyboard displayed.");
+
+        while(!Done)
         {
-            Result += Input[i];
+            if(Api_Touch::ReadTouch())
+            {
+                if(!Api_Touch::Swipe && !Api_Touch::Hold)
+                {
+                    bool Separator = (Index > 0 && Index < 16);
+
+                    if(!Multi)
+                    {
+                        for(int i = 0; i < Index; i++)
+                        {
+                            if(Input[Index] == '.') { Separator = false; }
+                        }
+                    }
+
+                    if(Api_Touch::TouchY > 132 && Api_Touch::TouchY < 159)
+                    {
+                        if(Api_Touch::TouchX > 0 && Api_Touch::TouchX < 24) { if(Index < 16) { Input[Index] = '1'; Index++; } }
+                        if(Api_Touch::TouchX > 24 && Api_Touch::TouchX < 48) { if(Index < 16) { Input[Index] = '2'; Index++; } }
+                        if(Api_Touch::TouchX > 48 && Api_Touch::TouchX < 72) { if(Index < 16) { Input[Index] = '3'; Index++; } }
+                        if(Api_Touch::TouchX > 72 && Api_Touch::TouchX < 96) { if(Index < 16) { Input[Index] = '4'; Index++; } }
+                        if(Api_Touch::TouchX > 96 && Api_Touch::TouchX < 120) { if(Index < 16) { Input[Index] = '5'; Index++; } }
+                        if(Api_Touch::TouchX > 120 && Api_Touch::TouchX < 144) { if(Index < 16) { Input[Index] = '6'; Index++; } }
+                        if(Api_Touch::TouchX > 144 && Api_Touch::TouchX < 168) { if(Index < 16) { Input[Index] = '7'; Index++; } }
+                        if(Api_Touch::TouchX > 168 && Api_Touch::TouchX < 192) { if(Index < 16) { Input[Index] = '8'; Index++; } }
+                        if(Api_Touch::TouchX > 192 && Api_Touch::TouchX < 216) { if(Index < 16) { Input[Index] = '9'; Index++; } }
+                        if(Api_Touch::TouchX > 216 && Api_Touch::TouchX < 240) { if(Index < 16) { Input[Index] = '0'; Index++; } }
+                    }
+
+                    if(Api_Touch::TouchY > 213 && Api_Touch::TouchY < 240)
+                    {
+                        if(Api_Touch::TouchX > 36 && Api_Touch::TouchX < 82)
+                        {
+                            if(Decimals && Separator) { Input[Index] = '.'; Index++; }
+                        }
+
+                        if(Api_Touch::TouchX > 82 && Api_Touch::TouchX < 158)
+                        {
+                            if(Negative && Index == 0) { Input[Index] = '-'; Index++; }
+                        }
+
+                        if(Api_Touch::TouchX > 158 && Api_Touch::TouchX < 204)
+                        {
+                            if(Decimals && Separator) { Input[Index] = '.'; Index++; }
+                        }
+
+                        if(Api_Touch::TouchX > 0 && Api_Touch::TouchX < 36)
+                        {
+                            if(Index > 0) { Index--; }
+                        }
+
+                        if(Api_Touch::TouchX > 204 && Api_Touch::TouchX < 240)
+                        {
+                            Done = true;
+                        }
+                    }
+
+                    Result = "";
+
+                    Api_Display::DrawRectangle(0, 0, 240, 130, Color_Black_Dark, true);
+
+                    for (int i = 0; i < Index; i++)
+                    {
+                        Result += Input[i];
+                    }
+
+                    Api_Display::DrawText(Result, 10, 10, 2, Color_White_Light, Color_Black_Dark);
+                }
+            }
+
+            if(Api_Touch::ReadButton())
+			{
+                Result = "";
+				Done = true;
+			}
+            
+            delay(10);
         }
+
+        Api_Console::Log(Api_Console::LogType::Info, "Result: " + Result);
+
         return Result;
     }
 }

@@ -2,5 +2,6 @@
 
 namespace Gui_Keyboard
 {
-    String GetInput(String Text);
+    String TextInput(String Text = "", bool Password = false);
+    String NumberInput(bool Negative = true, bool Decimals = false, bool Multi = false);
 }

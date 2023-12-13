@@ -1,192 +1,301 @@
 #include "main.h"
 
 TTGOClass* SmartWatch = 0;
-String OsVersion = "1.21.0";
+String OsVersion = "1.24.0";
 
-String Apps[] = {"Appstore", "Calc", "Browser", "Calendar", "Camera", "Clock", /*"Desktop",*/ "Files", "Gallery", "Maps", "Music", "Notes", "Paint", "Radio", "Recorder", "Remote", "Settings", "Terminal", "Weather", ""};
+String Apps[] = { "Appstore", "Browser", "Calc", "Calendar", "Camera", "Clock", "Crypto", "Desktop", "Discord", "Files", "Gallery", "Maps", "Mesenger", "Music", "Notes", "Paint", "Radio", "Recorder", "Remote", "Settings", "Spotify", "Steam", "Terminal", "Weather", "" };
 
+String Icon1 = "";
+String Icon2 = "";
+String Icon3 = "";
+String Icon4 = "";
+String Icon5 = "";
+
+bool WifiState = false;
+bool BluetoothState = false;
 int AppsNumber = 0;
 int PagesNumber = 0;
+bool Panel = false;
+int Timeout = 0;
 int Page = 0;
 
 // Utils:
-#include "apis\display.h"
-#include "apis\time.h"
-#include "apis\touch.h"
-#include "apis\wifi.h"
+#include "apis/accel.h"
+#include "apis/battery.h"
+#include "apis/bios.h"
+#include "apis/bluetooth.h"
+#include "apis/console.h"
+#include "apis/display.h"
+#include "apis/gps.h"
+#include "apis/ir.h"
+#include "apis/settings.h"
+#include "apis/time.h"
+#include "apis/touch.h"
+#include "apis/vibration.h"
+#include "apis/wifi.h"
 
 // Guis:
-#include "guis\keyboard.h"
+#include "guis/alert.h"
+#include "guis/keyboard.h"
 
 // Apps:
-#include "apps\settings.h"
+#include "apps/appstore.h"
+#include "apps/browser.h"
+#include "apps/calc.h"
+#include "apps/calendar.h"
+#include "apps/camera.h"
+#include "apps/clock.h"
+#include "apps/crypto.h"
+#include "apps/desktop.h"
+#include "apps/discord.h"
+#include "apps/files.h"
+#include "apps/gallery.h"
+#include "apps/maps.h"
+#include "apps/mesenger.h"
+#include "apps/music.h"
+#include "apps/notes.h"
+#include "apps/paint.h"
+#include "apps/radio.h"
+#include "apps/recorder.h"
+#include "apps/remote.h"
+#include "apps/settings.h"
+#include "apps/spotify.h"
+#include "apps/steam.h"
+#include "apps/terminal.h"
+#include "apps/weather.h"
 
-void sleep()
+void DisplayIcons(String IconA, String IconB, String IconC, String IconD, String IconE, uint16_t Color, bool Force = false)
 {
-    Api_Wifi::Toggle(false);
-
-    SmartWatch->rtc->syncToRtc();
-    SmartWatch->power->clearIRQ();
-    SmartWatch->bma->readInterrupt();
-
-    gpio_wakeup_enable((gpio_num_t)AXP202_INT, GPIO_INTR_LOW_LEVEL);
-    gpio_wakeup_enable((gpio_num_t)BMA423_INT1, GPIO_INTR_HIGH_LEVEL);
-    gpio_wakeup_enable((gpio_num_t)RTC_INT, GPIO_INTR_LOW_LEVEL);
-    gpio_wakeup_enable((gpio_num_t)TOUCH_INT, GPIO_INTR_LOW_LEVEL);
-
-    setCpuFrequencyMhz(80);
-    esp_sleep_enable_gpio_wakeup();
-    esp_light_sleep_start();
-    setCpuFrequencyMhz(240);
-    
-    SmartWatch->power->clearIRQ();
-    SmartWatch->bma->readInterrupt();
-    SmartWatch->rtc->syncToSystem();
-    
-    Api_Wifi::Toggle(true);
-}
-
-void PrintDirectory(fs::File Directory)
-{
-    while (true)
+    if(Force)
     {
-        fs::File File = Directory.openNextFile();
-        if (! File)
+        Icon1 = "1";
+        Icon2 = "2";
+        Icon3 = "3";
+        Icon4 = "4";
+        Icon5 = "5";
+    }
+
+    if(Icon1 != IconA)
+    {
+        Icon1 = IconA;
+
+        if(Icon1.length() > 1)
         {
-            break;
+            Api_Display::DrawBmp("/System/Icons/" + Icon1 + ".bmp", 90, 5);
         }
-        Serial.print(File.name());
-        Serial.print("\t\t");
-        Serial.println(File.size(), DEC);
-        File.close();
-    }
-}
-
-void ChangePage()
-{
-    if(Page > PagesNumber)
-    {
-        Page = 0;
-    }
-    if(Page < 0)
-    {
-        Page = PagesNumber;
-    }
-
-    SmartWatch->tft->fillRect(0, 0, 240, 35, SmartWatch->tft->color565(250-50, 250-100, 250-150));
-    SmartWatch->tft->fillRect(0, 35, 240, 205, SmartWatch->tft->color565(250-0, 250-75, 250-125));
-    SmartWatch->tft->textcolor = SmartWatch->tft->color565(25, 25, 25);
-    SmartWatch->tft->textbgcolor = SmartWatch->tft->color565(250-0, 250-75, 250-125);
-    SmartWatch->tft->setTextSize(1);
-
-    for(int i = 0; i < 6; i++)
-    {
-        if(Apps[Page*6+i] == "")
+        else
         {
-            break;
+            Api_Display::DrawRectangle(90, 5, 25, 25, Color);
         }
+    }
+    
+    if(Icon2 != IconB)
+    {
+        Icon2 = IconB;
 
-        int PosX = 0;
-        int PosY = 0;
+        if(Icon2.length() > 1)
+        {
+            Api_Display::DrawBmp("/System/Icons/" + Icon2 + ".bmp", 120, 5);
+        }
+        else
+        {
+            Api_Display::DrawRectangle(120, 5, 25, 25, Color);
+        }
+    }
 
-        if(i == 0) { PosX = 20; PosY = 55; }
-        if(i == 1) { PosX = 95; PosY = 55; }
-        if(i == 2) { PosX = 170; PosY = 55; }
-        if(i == 3) { PosX = 20; PosY = 150; }
-        if(i == 4) { PosX = 95; PosY = 150; }
-        if(i == 5) { PosX = 170; PosY = 150; }
+    if(Icon3 != IconC)
+    {
+        Icon3 = IconC;
 
-        Api_Display::DrawBmp("/System/Apps/" + Apps[Page*6+i] + ".bmp", PosX, PosY);
-        
-        PosX += 25;
-        PosY += 60;
+        if(Icon3.length() > 1)
+        {
+            Api_Display::DrawBmp("/System/Icons/" + Icon3 + ".bmp", 150, 5);
+        }
+        else
+        {
+            Api_Display::DrawRectangle(150, 5, 25, 25, Color);
+        }
+    }
 
-        PosX -= Apps[Page*6+i].length()*3;
-        SmartWatch->tft->drawString(Apps[Page*6+i], PosX, PosY);
+    if(Icon4 != IconD)
+    {
+        Icon4 = IconD;
+
+        if(Icon4.length() > 1)
+        {
+            Api_Display::DrawBmp("/System/Icons/" + Icon4 + ".bmp", 180, 5);
+        }
+        else
+        {
+            Api_Display::DrawRectangle(180, 5, 25, 25, Color);
+        }
+    }
+
+    if(Icon5 != IconE)
+    {
+        Icon5 = IconE;
+
+        if(Icon5.length() > 1)
+        {
+            Api_Display::DrawBmp("/System/Icons/" + Icon5 + ".bmp", 210, 5);
+        }
+        else
+        {
+            Api_Display::DrawRectangle(210, 5, 25, 25, Color);
+        }
     }
 }
 
-bool irq = false;
+void ChangePage(bool OnlyIcons)
+{
+    Panel = false;
+
+    if(Page > PagesNumber) { Page = 0; }
+    if(Page < 0) { Page = PagesNumber; }
+
+    if(!OnlyIcons)
+    {
+        Api_Display::DrawRectangle(0, 0, 240, 35, Color_Brown_Medium);
+        Api_Display::DrawRectangle(0, 35, 240, 205, Color_Brown_Light);
+    }
+
+    if((Page * 6) + 0 < AppsNumber)
+    {
+        String Name = Apps[Page * 6 + 0];
+        Api_Display::DrawRectangle(20, 55, 50, 70, Color_Brown_Light);
+        Api_Display::DrawBmp("/System/Apps/" + Name + ".bmp", 20, 55);
+        Api_Display::DrawText(Name, 45 - (Name.length() * 3), 115, 1, Color_Black_Dark, Color_Brown_Light);
+    }
+    else
+    {
+        Api_Display::DrawRectangle(20, 55, 50, 70, Color_Brown_Light);
+    }
+    
+    if((Page * 6) + 1 < AppsNumber)
+    {
+        String Name = Apps[Page * 6 + 1];
+        Api_Display::DrawRectangle(95, 55, 50, 70, Color_Brown_Light);
+        Api_Display::DrawBmp("/System/Apps/" + Name + ".bmp", 95, 55);
+        Api_Display::DrawText(Name, 120 - (Name.length() * 3), 115, 1, Color_Black_Dark, Color_Brown_Light);
+    }
+    else
+    {
+        Api_Display::DrawRectangle(95, 55, 50, 70, Color_Brown_Light);
+    }
+    
+    if((Page * 6) + 2 < AppsNumber)
+    {
+        String Name = Apps[Page * 6 + 2];
+        Api_Display::DrawRectangle(170, 55, 50, 70, Color_Brown_Light);
+        Api_Display::DrawBmp("/System/Apps/" + Name + ".bmp", 170, 55);
+        Api_Display::DrawText(Name, 195 - (Name.length() * 3), 115, 1, Color_Black_Dark, Color_Brown_Light);
+    }
+    else
+    {
+        Api_Display::DrawRectangle(170, 55, 50, 70, Color_Brown_Light);
+    }
+
+    if((Page * 6) + 3 < AppsNumber)
+    {
+        String Name = Apps[Page * 6 + 3];
+        Api_Display::DrawRectangle(20, 150, 50, 70, Color_Brown_Light);
+        Api_Display::DrawBmp("/System/Apps/" + Name + ".bmp", 20, 150);
+        Api_Display::DrawText(Name, 45 - (Name.length() * 3), 210, 1, Color_Black_Dark, Color_Brown_Light);
+    }
+    else
+    {
+        Api_Display::DrawRectangle(20, 150, 50, 70, Color_Brown_Light);
+    }
+    
+    if((Page * 6) + 4 < AppsNumber)
+    {
+        String Name = Apps[Page * 6 + 4];
+        Api_Display::DrawRectangle(95, 150, 50, 70, Color_Brown_Light);
+        Api_Display::DrawBmp("/System/Apps/" + Name + ".bmp", 95, 150);
+        Api_Display::DrawText(Name, 120 - (Name.length() * 3), 210, 1, Color_Black_Dark, Color_Brown_Light);
+    }
+    else
+    {
+        Api_Display::DrawRectangle(95, 150, 50, 70, Color_Brown_Light);
+    }
+    
+    if((Page * 6) + 5 < AppsNumber)
+    {
+        String Name = Apps[Page * 6 + 5];
+        Api_Display::DrawRectangle(170, 150, 50, 70, Color_Brown_Light);
+        Api_Display::DrawBmp("/System/Apps/" + Name + ".bmp", 170, 150);
+        Api_Display::DrawText(Name, 195 - (Name.length() * 3), 210, 1, Color_Black_Dark, Color_Brown_Light);
+    }
+    else
+    {
+        Api_Display::DrawRectangle(170, 150, 50, 70, Color_Brown_Light);
+    }
+
+    if(!OnlyIcons)
+    {
+        DisplayIcons(Icon1, Icon2, Icon3, Icon4, Icon5, Color_Brown_Medium, true);
+    }
+}
+
+void DisplayCenter(bool OnlyIcons)
+{
+    Panel = true;
+
+    if(!OnlyIcons)
+    {
+        Api_Display::DrawRectangle(0, 0, 240, 35, Color_Black_Medium);
+        Api_Display::DrawRectangle(0, 35, 240, 205, Color_Black_Light);
+    }
+    
+    int Pos = 20 + (Api_Display::GetBrightness() * 20);
+    Api_Display::DrawRectangle(0, 160, 240, 80, Color_Black_Light);
+    Api_Display::DrawRectangle(40, 190, 160, 15, Color_White_Medium);
+    SmartWatch->tft->fillCircle(40, 197, 7, Color_White_Medium);
+    SmartWatch->tft->fillCircle(200, 197, 7, Color_White_Medium);
+    SmartWatch->tft->fillCircle(Pos, 197, 17, Color_Grey_Light);
+
+    if(WifiState)
+    {
+        Api_Display::DrawBmp("/System/Icons/WifiOn.bmp", 25, 55);
+    }
+    else
+    {
+        Api_Display::DrawBmp("/System/Icons/WifiOff.bmp", 25, 55);
+    }
+
+    if(BluetoothState)
+    {
+        Api_Display::DrawBmp("/System/Icons/BtOn.bmp", 135, 55);
+    }
+    else
+    {
+        Api_Display::DrawBmp("/System/Icons/BtOff.bmp", 135, 55);
+    }
+
+    if(!OnlyIcons)
+    {
+        DisplayIcons(Icon1, Icon2, Icon3, Icon4, Icon5, Color_Black_Medium, true);
+    }
+}
 
 void setup()
 {
-    SmartWatch = TTGOClass::getWatch();
-    SmartWatch->begin();
+    Api_Console::Setup();
+    Api_Bios::Setup();
+    Api_Time::Setup();
+    Api_Settings::Setup();
+    Api_Battery::Setup();
+    Api_Display::Setup();
+    Api_Touch::Setup();
+    Api_Accel::Setup();
+    Api_Gps::Setup();
+    Api_Ir::Setup();
+    Api_Wifi::Setup();
+    Api_Bluetooth::Setup();
+    Api_Vibration::Setup();
 
-    pinMode(AXP202_INT, INPUT_PULLUP);
-    pinMode(BMA423_INT1, INPUT_PULLUP);
-    pinMode(RTC_INT, INPUT_PULLUP);
-    pinMode(TOUCH_INT, INPUT_PULLUP);
-
-    SmartWatch->rtc->check();
-    SmartWatch->rtc->syncToSystem();
-
-    SmartWatch->motor_begin();
-    SmartWatch->motor->onec();
-
-    SmartWatch->power->begin();
-    SmartWatch->power->enableIRQ(AXP202_PEK_SHORTPRESS_IRQ, true);
-    SmartWatch->power->setChargeControlCur(300);
-    
-    SmartWatch->bma->begin();
-    SmartWatch->bma->enableAccel();
-    SmartWatch->bma->enableFeature(BMA423_STEP_CNTR, true);
-    SmartWatch->bma->enableFeature(BMA423_TILT, true);
-    SmartWatch->bma->resetStepCounter();
-    SmartWatch->bma->enableTiltInterrupt();
-
-    struct bma423_axes_remap AxelData;
-    AxelData.x_axis = 0;
-    AxelData.x_axis_sign = 1;
-    AxelData.y_axis = 1;
-    AxelData.y_axis_sign = 1;
-    AxelData.z_axis = 2;
-    AxelData.z_axis_sign = 1;
-    SmartWatch->bma->set_remap_axes(&AxelData);
-
-    Serial.begin(115200);
-    Serial.println("Starting...");
-    
-    SmartWatch->openBL();
-    SmartWatch->bl->adjust(100);
-    SmartWatch->tft->setRotation(0);
-    SmartWatch->tft->setTextSize(1);
-    SmartWatch->tft->setTextWrap(false, false);
-
-    SPIFFS.begin();
-
-    WiFi.setHostname("KubekSzklanySmartWatch");
-
-	delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(255, 25, 25); SmartWatch->tft->drawString(F("ESP32:"), 5, 5); delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(0, 255, 0); SmartWatch->tft->drawString(F("TTGO Smart-Watch v.2020"), 100, 5);
-	delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(255, 25, 25); SmartWatch->tft->drawString(F("Processor:"), 5, 15); delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(0, 255, 0); SmartWatch->tft->drawString(F("2x 240 Mhz"), 180, 15);
-    delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(255, 25, 25); SmartWatch->tft->drawString(F("Memory:"), 5, 25); delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(0, 255, 0); SmartWatch->tft->drawString(F("520 KB"), 200, 25);
-    delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(255, 25, 25); SmartWatch->tft->drawString(F("Disk:"), 5, 35); delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(0, 255, 0); SmartWatch->tft->drawString(F("16 MB"), 210, 35);
-    delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(255, 25, 25); SmartWatch->tft->drawString(F("Display:"), 5, 45); delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(0, 255, 0); SmartWatch->tft->drawString(F("Touch Screen 240 x 240"), 105, 45);
-    delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(255, 25, 25); SmartWatch->tft->drawString(F("WiFi:"), 5, 55); delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(0, 255, 0); SmartWatch->tft->drawString(F("802.11 b/g/n"), 165, 55);
-    delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(255, 25, 25); SmartWatch->tft->drawString(F("Bluetooth:"), 5, 65); delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(0, 255, 0); SmartWatch->tft->drawString(F("BLE v. 4.2"), 180, 65);
-    delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(255, 25, 25); SmartWatch->tft->drawString(F("Speakers:"), 5, 75); delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(0, 255, 0); SmartWatch->tft->drawString(F("MAX98357A"), 185, 75);
-    delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(255, 25, 25); SmartWatch->tft->drawString(F("Touch Sensor:"), 5, 85); delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(0, 255, 0); SmartWatch->tft->drawString(F("FT6236U"), 195, 85);
-    delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(255, 25, 25); SmartWatch->tft->drawString(F("Display Module:"), 5, 95); delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(0, 255, 0); SmartWatch->tft->drawString(F("ST7789V"), 195, 95);
-    delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(255, 25, 25); SmartWatch->tft->drawString(F("Power Sensor:"), 5, 105); delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(0, 255, 0); SmartWatch->tft->drawString(F("AXP202"), 200, 105);
-    delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(255, 25, 25); SmartWatch->tft->drawString(F("Clock Module:"), 5, 115); delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(0, 255, 0); SmartWatch->tft->drawString(F("PCF8563"), 195, 115);
-    delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(255, 25, 25); SmartWatch->tft->drawString(F("Axis Sensor:"), 5, 125); delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(0, 255, 0); SmartWatch->tft->drawString(F("BMA423"), 200, 125);
-    delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(255, 25, 25); SmartWatch->tft->drawString(F("Infrared Module:"), 5, 135); delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(0, 255, 0); SmartWatch->tft->drawString(F("Standard Diode"), 155, 135);
-    delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(255, 25, 25); SmartWatch->tft->drawString(F("Vibrations Sensor:"), 5, 145); delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(0, 255, 0); SmartWatch->tft->drawString(F("Standard Motor"), 155, 145);
-
-    delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(0, 125, 250); SmartWatch->tft->drawString(F("Bios checksum done!"), 5, 160);
-    delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(0, 125, 250); SmartWatch->tft->drawString(F("Launching boot loader..."), 5, 170);
-    delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(0, 125, 250); SmartWatch->tft->drawString(F("Searching for system..."), 5, 180);
-    delay(250); SmartWatch->tft->textcolor = SmartWatch->tft->color565(0, 125, 250); SmartWatch->tft->drawString(F("Found: KubekSzklany OS"), 5, 190);
-   
-    delay(500);
-    SmartWatch->tft->setTextSize(2);
-    SmartWatch->tft->textcolor = SmartWatch->tft->color565(250, 175, 0);
-    SmartWatch->tft->drawString(F("W E L C O M E !"), 10, 215);
-    delay(500); 
-
-    SmartWatch->tft->fillScreen(0);
-
-    Api_Display::DrawBmp("/System/OsLogo.bmp", 60, 60);
+    Api_Bios::Checksum(1000);
+    Api_Bios::Logo(5000);
 
     for (int i = 0; i < 111; i++)
     {
@@ -203,95 +312,139 @@ void setup()
         PagesNumber--;
     }
 
-    delay(2500);
+    Api_Console::Log(Api_Console::LogType::Info, "Smart watch setup done.");
 
-    ChangePage();
-}
+    Api_Wifi::Toggle(WifiState);
+    Api_Bluetooth::Toggle(BluetoothState);
 
-int Timeout = 0;
-bool Clock = false;
-
-void RunApp(int AppIndex)
-{
-    //Appstore, Calc, Browser, Calendar, Camera, Clock, Desktop, Files, Gallery, Maps, Music, Notes, Paint, Radio, Recorder, Remote, Settings, Terminal, Weather
-
-    switch (AppIndex)
-    {
-        //case 0: { App_AppStore::Main(); break; }
-        //case 1: { App_Calc::Main(); break; }
-        //case 2: { App_Browser::Main(); break; }
-        //case 3: { App_Calendar::Main(); break; }
-        case 4: { /*App_Camera::Main();*/ Api_Display::PrintScreen(); break; }
-        //case 5: { App_Clock::Main(); break; }
-        //case X: { App_Desktop::Main(); break; }
-        //case 5: { App_Files::Main(); break; }
-        //case 7: { App_Gallery::Main(); break; }
-        //case 8: { App_Maps::Main(); break; }
-        //case 9: { App_Music::Main(); break; }
-        //case 10: { App_Notes::Main(); break; }
-        //case 11: { App_Paint::Main(); break; }
-        //case 12: { App_Radio::Main(); break; }
-        //case 13: { App_Recorder::Main(); break; }
-        //case 14: { App_Remote::Main(); break; }
-        case 15: { App_Settings::Main(); break; }
-        //case 16: { App_Terminal::Main(); break; }
-        //case 17: { App_Weather::Main(); break; }
-        default: { break; };
-    }
-    ChangePage();
+    ChangePage(false);
 }
 
 void loop()
 {
-    if(Clock)
+    if (Api_Touch::ReadTouch())
     {
-        if(Timeout % 10 == 0)
+        Timeout = 0;
+
+        if(Api_Touch::Swipe)
         {
-            Api_Time::Update();
-
-            SmartWatch->tft->fillCircle(120, 120, 70, 0);
-
-            float HourAngle = (((Api_Time::Hour + 9) % 12) * 30 * PI) / 180;
-            int HourX = 120 + (40 * cos(HourAngle));
-            int HourY = 120 + (40 * sin(HourAngle));
-
-            float MinuteAngle = (((Api_Time::Minute + 45) % 60) * 6 * PI) / 180;
-            int MinuteX = 120 + (60 * cos(MinuteAngle));
-            int MinuteY = 120 + (60 * sin(MinuteAngle));
-
-            float SecondAngle = (((Api_Time::Second + 45) % 60) * 6 * PI) / 180;
-            int SecondX = 120 + (65 * cos(SecondAngle));
-            int SecondY = 120 + (65 * sin(SecondAngle));
-
-            SmartWatch->tft->drawLine(120, 120, HourX, HourY, SmartWatch->tft->color565(250, 250, 250));
-            SmartWatch->tft->drawLine(120, 120, MinuteX, MinuteY, SmartWatch->tft->color565(250, 250, 250));
-            SmartWatch->tft->drawLine(120, 120, SecondX, SecondY, SmartWatch->tft->color565(250, 0, 0));
-        }
-
-        if(Api_Touch::ReadTouch())
-        {
-            Clock = false;
-            ChangePage();
-        }
-    }
-    else
-    {
-        if (Api_Touch::ReadTouch())
-        {
-            Timeout = 0;
-
-            if(Api_Touch::Swipe)
+            if(Api_Touch::SwipeHorizontal)
             {
-                if(Api_Touch::SwipeX + 100 < Api_Touch::TouchX)
+                if(Panel)
                 {
-                    Page++;
-                    ChangePage();
+                    if(Api_Touch::SwipeY > 180 && Api_Touch::SwipeY < 220)
+                    {
+                        if(Api_Touch::SwipeX > 30 && Api_Touch::SwipeX < 50) { Api_Display::SetBrightness(1); }
+                        if(Api_Touch::SwipeX > 50 && Api_Touch::SwipeX < 70) { Api_Display::SetBrightness(2); }
+                        if(Api_Touch::SwipeX > 70 && Api_Touch::SwipeX < 90) { Api_Display::SetBrightness(3); }
+                        if(Api_Touch::SwipeX > 90 && Api_Touch::SwipeX < 110) { Api_Display::SetBrightness(4); }
+                        if(Api_Touch::SwipeX > 110 && Api_Touch::SwipeX < 130) { Api_Display::SetBrightness(5); }
+                        if(Api_Touch::SwipeX > 130 && Api_Touch::SwipeX < 150) { Api_Display::SetBrightness(6); }
+                        if(Api_Touch::SwipeX > 150 && Api_Touch::SwipeX < 170) { Api_Display::SetBrightness(7); }
+                        if(Api_Touch::SwipeX > 170 && Api_Touch::SwipeX < 190) { Api_Display::SetBrightness(8); }
+                        if(Api_Touch::SwipeX > 190 && Api_Touch::SwipeX < 210) { Api_Display::SetBrightness(9); }
+                    }
+
+                    DisplayCenter(true);
                 }
-                if(Api_Touch::SwipeX - 100 > Api_Touch::TouchX)
+                else
                 {
-                    Page--;
-                    ChangePage();
+                    if(Api_Touch::TouchX > Api_Touch::SwipeX)
+                    {
+                        Page++;
+                        ChangePage(true);
+                    }
+                    if(Api_Touch::TouchX < Api_Touch::SwipeX)
+                    {
+                        Page--;
+                        ChangePage(true);
+                    }
                 }
+            }
+            if(Api_Touch::SwipeVertical)
+            {
+                if(Panel)
+                {
+                    ChangePage(false);
+                }
+                else
+                {
+                    DisplayCenter(false);
+                }
+            }
+        }
+        else
+        {
+            if(Panel)
+            {
+                bool Mode = true;
+
+                if(Api_Touch::TouchX > 20 && Api_Touch::TouchX < 110 && Api_Touch::TouchY > 50 && Api_Touch::TouchY < 130)
+                {
+                    if(Api_Touch::Click)
+                    {
+                        WifiState = !WifiState;
+
+                        if(WifiState && BluetoothState)
+                        {
+                            Gui_Alert::ShowOk("Error", "You cannot use    WiFi and BlueTooth    at the same time.");
+
+                            WifiState = !WifiState;
+                        }
+                        else
+                        {
+                            Api_Wifi::Toggle(WifiState);
+                        }
+                    }
+                    
+                    if(Api_Touch::Hold)
+                    {
+                        Mode = false;
+                        
+                        Api_Wifi::Main();
+                    }
+                }
+
+                if(Api_Touch::TouchX > 130 && Api_Touch::TouchX < 220 && Api_Touch::TouchY > 50 && Api_Touch::TouchY < 130)
+                {
+                    if(Api_Touch::Click)
+                    {
+                        BluetoothState = !BluetoothState;
+
+                        if(WifiState && BluetoothState)
+                        {
+                            Gui_Alert::ShowOk("Error", "You cannot use    WiFi and BlueTooth    at the same time.");
+
+                            BluetoothState = !BluetoothState;
+                        }
+                        else
+                        {
+                            Api_Bluetooth::Toggle(BluetoothState);
+                        }
+                    }
+
+                    if(Api_Touch::Hold)
+                    {
+                        Mode = false;
+
+                        Api_Bluetooth::Main();
+                    }
+                }
+
+                if(Api_Touch::TouchY > 180 && Api_Touch::TouchY < 220)
+                {
+                    if(Api_Touch::TouchX > 30 && Api_Touch::TouchX < 50) { Api_Display::SetBrightness(1); }
+                    if(Api_Touch::TouchX > 50 && Api_Touch::TouchX < 70) { Api_Display::SetBrightness(2); }
+                    if(Api_Touch::TouchX > 70 && Api_Touch::TouchX < 90) { Api_Display::SetBrightness(3); }
+                    if(Api_Touch::TouchX > 90 && Api_Touch::TouchX < 110) { Api_Display::SetBrightness(4); }
+                    if(Api_Touch::TouchX > 110 && Api_Touch::TouchX < 130) { Api_Display::SetBrightness(5); }
+                    if(Api_Touch::TouchX > 130 && Api_Touch::TouchX < 150) { Api_Display::SetBrightness(6); }
+                    if(Api_Touch::TouchX > 150 && Api_Touch::TouchX < 170) { Api_Display::SetBrightness(7); }
+                    if(Api_Touch::TouchX > 170 && Api_Touch::TouchX < 190) { Api_Display::SetBrightness(8); }
+                    if(Api_Touch::TouchX > 190 && Api_Touch::TouchX < 210) { Api_Display::SetBrightness(9); }
+                }
+
+                DisplayCenter(Mode);
             }
             else
             {
@@ -304,72 +457,116 @@ void loop()
                 if(Api_Touch::TouchX > 90 && Api_Touch::TouchX < 150 && Api_Touch::TouchY > 145 && Api_Touch::TouchY < 215) { App = 4; }
                 if(Api_Touch::TouchX > 165 && Api_Touch::TouchX < 225 && Api_Touch::TouchY > 145 && Api_Touch::TouchY < 215) { App = 5; }
 
-                if(App > -1)
+                if(App > -1 && App < AppsNumber)
                 {
-                    RunApp(App + 6 * Page);
+                    Api_Console::Log(Api_Console::LogType::Info, "App launched: " + Apps[App + (6 * Page)]);
+
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Appstore")) { App_Appstore::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Browser")) { App_Browser::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Calc")) { App_Calc::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Calendar")) { App_Calendar::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Camera")) { App_Camera::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Clock")) { App_Clock::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Crypto")) { App_Crypto::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Desktop")) { App_Desktop::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Discord")) { App_Discord::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Files")) { App_Files::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Gallery")) { App_Gallery::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Maps")) { App_Maps::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Mesenger")) { App_Mesenger::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Music")) { App_Music::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Notes")) { App_Notes::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Paint")) { App_Paint::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Radio")) { App_Radio::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Recorder")) { App_Recorder::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Remote")) { App_Remote::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Settings")) { App_Settings::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Spotify")) { App_Spotify::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Steam")) { App_Steam::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Terminal")) { App_Terminal::Main(); }
+                    if(Apps[App + (6 * Page)].equalsIgnoreCase("Weather")) { App_Weather::Main(); }
+
+                    Api_Console::Log(Api_Console::LogType::Info, "Back to main menu.");
+                    
+                    ChangePage(false);
                 }
             }
         }
-
-        Api_Time::Update();
-
-        String Text = "";
-
-        if(Api_Time::Hour < 10) { Text += "0"; }
-        Text += Api_Time::Hour;
-        Text += ":";
-        if(Api_Time::Minute < 10) { Text += "0"; }
-        Text += Api_Time::Minute;
-        /*Text += ":";
-        if(Second < 10) { Text += "0"; }
-        Text += Second;
-        Text += " ";
-        if(Day < 10) { Text += "0"; }
-        Text += Day;
-        Text += "-";
-        if(Month < 10) { Text += "0"; }
-        Text += Month;
-        Text += "-";
-        Text += Year;*/
-        Text += "    ";
-        if(btStarted())
-        {
-            Text += "B  ";
-        }
-        else
-        {
-            Text += "   ";
-        }
-        if(WiFi.status() == WL_CONNECTED)
-        {
-            Text += "W  ";
-        }
-        else
-        {
-            Text += "   ";
-        }
-        Text += (SmartWatch->power->getBattPercentage());
-        Text += "%";
-
-        SmartWatch->tft->setTextSize(2);
-        SmartWatch->tft->textcolor = SmartWatch->tft->color565(250, 250, 250);
-        SmartWatch->tft->textbgcolor = SmartWatch->tft->color565(250-50, 250-100, 250-150);
-        SmartWatch->tft->drawString(Text, 10, 10);
-
     }
-    
-    delay(100);
 
-    Timeout++;
+    String IconWifi = "";
+    String IconBluetooth = "";
+    String IconBattery = "";
 
-    if(Timeout > 250)
+    if(WifiState)
     {
-        Api_Display::Toggle(false);
-        sleep();
-        Clock = true;
-        SmartWatch->tft->fillScreen(0);
-        Api_Display::DrawBmp("/System/Clock.bmp", 0, 0);
-        Api_Display::Toggle(true);
+        if(Api_Wifi::Connected()) { IconWifi = "WifiYes"; }
+        else { IconWifi = "WifiNo"; }
+    }
+
+    if(BluetoothState)
+    {
+        if(Api_Bluetooth::Connected()) { IconBluetooth = "BtYes"; }
+        else { IconBluetooth = "BtNo"; }
+    }
+
+    int Percentage = Api_Battery::Percentage();
+
+    if(Api_Battery::Chargeing())
+    {
+        IconBattery = "ChargeNormal";
+        if(Percentage < 10) { IconBattery = "ChargeEmpty"; }
+        if(Percentage > 90) { IconBattery = "ChargeFull";  }
+    }
+    else
+    {
+        IconBattery = "Battery";
+        if(Percentage > 10) { IconBattery = "BatteryEmpty"; }
+        if(Percentage > 30) { IconBattery = "BatteryLow"; }
+        if(Percentage > 50) { IconBattery = "BatteryMedium"; }
+        if(Percentage > 70) { IconBattery = "BatteryHigh"; }
+        if(Percentage > 90) { IconBattery = "BatteryFull"; }
+    }
+
+    Api_Time::Update();
+
+    String Text = Api_Time::TimeText(true, true, false, true);
+
+    if(Panel)
+    {
+        Api_Display::DrawText(Text, 10, 10, 2, Color_White_Light, Color_Black_Medium);
+        DisplayIcons("", "", IconBluetooth, IconWifi, IconBattery, Color_Black_Medium);
+    }
+    else
+    {
+        Api_Display::DrawText(Text, 10, 10, 2, Color_White_Light, Color_Brown_Medium);
+        DisplayIcons("", "", IconBluetooth, IconWifi, IconBattery, Color_Brown_Medium);
+    }
+
+    delay(50);
+
+    if(WifiState) { Api_Wifi::Loop(); }
+    if(BluetoothState) { Api_Bluetooth::Loop(); }
+
+    delay(50);
+
+    if(Timeout++ > 500 || Api_Touch::ReadButton())
+    {
+        Icon1 = "";
+        Icon2 = "";
+        Icon3 = "";
+        Icon4 = "";
+        Icon5 = "";
+
+        Api_Wifi::Toggle(false);
+        Api_Bluetooth::Toggle(false);
+
+        App_Clock::Main(true);
+        ChangePage(false);
+
+        Api_Wifi::Toggle(WifiState);
+        Api_Bluetooth::Toggle(BluetoothState);
+
         Timeout = 0;
     }
 }

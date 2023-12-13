@@ -1,5 +1,8 @@
 #include "touch.h"
 
+#include "apis/console.h"
+#include "apis/vibration.h"
+
 namespace Api_Touch
 {
     int16_t TouchX;
@@ -9,31 +12,103 @@ namespace Api_Touch
 
     bool Hold;
     bool Swipe;
+    bool Click;
 
-    bool ReadTouch()
+    bool SwipeHorizontal;
+    bool SwipeVertical;
+
+    void Setup()
+    {
+        bool Result = true;
+
+        if(Result)
+        {
+            Api_Console::Log(Api_Console::LogType::Ok, "Touch initialized sucessfully.");
+        }
+        else
+        {
+            Api_Console::Log(Api_Console::LogType::Error, "Failed to initialize touch.");
+        }
+    }
+
+    bool ReadTouch(bool WaitForRelease)
     {
         Hold = false;
         Swipe = false;
+        Click = false;
+
+        SwipeHorizontal = false;
+        SwipeVertical = false;
 
         int HoldCounter = 0;
 
         if(SmartWatch->getTouch(TouchX, TouchY))
         {
-            while(SmartWatch->getTouch(SwipeX, SwipeY))
+            if(WaitForRelease)
             {
-                HoldCounter++;
-                delay(10);
+                while(SmartWatch->getTouch(SwipeX, SwipeY))
+                {
+                    if(HoldCounter++ == 50)
+                    {
+                        Api_Vibration::Vibrate();
+                    }
+
+                    delay(10);
+                }
+
+                int SwipeHorizontalLength = abs(TouchX - SwipeX);
+                int SwipeVerticalLength = abs(TouchY - SwipeY);
+
+                if(SwipeHorizontalLength > 50)
+                {
+                    SwipeHorizontal = true;
+                    Swipe = true;
+                }
+
+                if(SwipeVerticalLength > 50)
+                {
+                    SwipeVertical = true;
+                    Swipe = true;
+                }
+
+                if(HoldCounter > 50)
+                {
+                    Hold = !Swipe;
+                }
+
+                if(Swipe)
+                {
+                    if(SwipeHorizontalLength > SwipeVerticalLength)
+                    {
+                        SwipeVertical = false;
+                    }
+
+                    if(SwipeHorizontalLength < SwipeVerticalLength)
+                    {
+                        SwipeHorizontal = false;
+                    }
+                }
             }
-            if(HoldCounter > 99)
+
+            Click = (!Swipe && !Hold);
+
+            if(Click)
             {
-                Hold = true;
+                Api_Vibration::Vibrate();
             }
-            if(abs(TouchX - SwipeX) > 25 || abs(TouchY - SwipeY) > 25)
-            {
-                Swipe = true;
-            }
+
             return true;
         }
+        
         return false;
+    }
+
+    bool ReadButton()
+    {
+        SmartWatch->power->readIRQ();
+        bool Short = SmartWatch->power->isPEKShortPressIRQ();
+        bool Long = SmartWatch->power->isPEKLongtPressIRQ();
+        SmartWatch->power->clearIRQ();
+        return (Short || Long);
     }
 }

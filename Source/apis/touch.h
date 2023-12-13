@@ -9,6 +9,13 @@ namespace Api_Touch
 
     extern bool Hold;
     extern bool Swipe;
+    extern bool Click;
 
-    bool ReadTouch();
+    extern bool SwipeHorizontal;
+    extern bool SwipeVertical;
+
+    void Setup();
+    
+    bool ReadTouch(bool WaitForRelease = true);
+    bool ReadButton();
 }
